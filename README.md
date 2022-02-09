@@ -1,2 +1,2 @@
 # SeminalRootAngleExtractor
-GUI application to enable measurement of seminal root angles from segmentations
+GUI application to measure seminal root angle from segmentations
