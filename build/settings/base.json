@@ -1,8 +1,0 @@
-{
-    "verbose": true,
-    "app_name": "SeminalRootAngleExtractor",
-    "author": "Abraham George Smith",
-    "main_module": "main.py",
-    "version": "0.0.1",
-    "hidden_imports": []
-}
