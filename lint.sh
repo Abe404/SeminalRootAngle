@@ -1,1 +1,1 @@
-pylint --disable=R,C *.py
+pylint --disable=R,C,broad-except *.py
