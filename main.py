@@ -52,9 +52,9 @@ class ProgressWatchThread(QThread):
         print("file_name,angle_degrees,seed_index,seed_x,seed_y,seed_pixels", file=csv_file)
         print("file_name,error_message,seed_index,seed_x,seed_y,seed_pixels", file=error_file)
         errors = []
-        for i, fname in enumerate(seg_fnames[:5]):
+        for i, fname in enumerate(seg_fnames):
             print(f"Extracting angles:{i + 1}/{len(seg_fnames)}", fname)
-            self.progress_change.emit(i+1, 5) # len(seg_fnames))
+            self.progress_change.emit(i+1, len(seg_fnames))
             try:
                 get_angles_from_image(self.root_seg_dir, self.im_dataset_dir,
                                       self.seed_seg_dir,
@@ -98,24 +98,17 @@ class SeminalRootAngleExtractor(QMainWindow):
     def __init__(self):
         super().__init__()
 
+
+        self.progress_widget = None
+
         self.setWindowTitle("Seminal Root Angle Extractor")
-        self.setGeometry(100, 100, 400, 450)
+        #self.setGeometry(100, 100, 400, 450)
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
 
         self.layout = QGridLayout()
         self.central_widget.setLayout(self.layout)
-
-
-        # Create a progress bar
-        self.progress_label = QLabel("Input required")
-        self.layout.addWidget(self.progress_label, 5, 0, 1, 2)
-        self.progress_bar = QProgressBar()
-        self.layout.addWidget(self.progress_bar, 6, 0, 1, 2)
-        self.progress_value = 0
-
-        self.progress_widget = None
 
         self.root_seg_dir_label = QLabel("Root Segmentation Directory: None")
         self.seed_seg_dir_label = QLabel("Seed Segmentation Directory: None")
@@ -132,9 +125,12 @@ class SeminalRootAngleExtractor(QMainWindow):
             self.select_output_folder, self.output_dir_label, 3)
 
         # Create a submit button
+
         self.submit_button = QPushButton("Extract angles")
         self.submit_button.clicked.connect(self.create_output_folder)
-        self.layout.addWidget(self.submit_button, 4, 0, 1, 2)
+
+        #row: int, column: int, rowSpan: int, columnSpan: int, alignment: Qt.AlignmentFlag = Qt.Alignment()):
+        self.layout.addWidget(self.submit_button, 4, 0, 1, 4)
 
         self.root_seg_dir = ""
         self.seed_seg_dir = ""
@@ -209,7 +205,7 @@ class SeminalRootAngleExtractor(QMainWindow):
             missing_directories.append("Output")
 
 
-        if missing_directories and False:
+        if missing_directories:
             QMessageBox.critical(
                 self,
                 "Missing Directories",
@@ -233,8 +229,6 @@ class SeminalRootAngleExtractor(QMainWindow):
     def extract_angles(self, output_folder):
         print('Extract angles')
         self.progress_widget = ProgressWidget(f'Extracting angles to {output_folder}')
-        #self.progress_bar.setMaximum(len(ls(self.root_seg_dir)))
-        self.progress_bar.setMaximum(5)#len(ls(self.root_seg_dir)))
         self.progress_widget.run(root_seg_dir=self.root_seg_dir,
                                  im_dataset_dir=self.input_photo_dir,
                                  seed_seg_dir=self.seed_seg_dir,
