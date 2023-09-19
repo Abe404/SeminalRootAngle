@@ -23,7 +23,7 @@ class ProgressWatchThread(QThread):
     Runs another thread.
     """
     progress_change = pyqtSignal(int, int)
-    done = pyqtSignal()
+    done = pyqtSignal(list)
 
     def __init__(self, root_seg_dir,
             im_dataset_dir, seed_seg_dir,
@@ -46,17 +46,15 @@ class ProgressWatchThread(QThread):
         seg_fnames = os.listdir(self.seed_seg_dir)
         seg_fnames = [s for s in seg_fnames if '.png' in s]
         start = time.time()
-        total_images = len(seg_fnames)
-        self.progress_bar.setMaximum(total_images)
-
 
         csv_file = open(self.output_csv_path, 'w+')
         error_file = open(self.error_csv_path, 'w+')
         print("file_name,angle_degrees,seed_index,seed_x,seed_y,seed_pixels", file=csv_file)
         print("file_name,error_message,seed_index,seed_x,seed_y,seed_pixels", file=error_file)
-
-        for fname in seg_fnames:
-            print(f"Extracting angles:{seg_fnames.index(fname) + 1}/{len(seg_fnames)}", fname)
+        errors = []
+        for i, fname in enumerate(seg_fnames[:5]):
+            print(f"Extracting angles:{i + 1}/{len(seg_fnames)}", fname)
+            self.progress_change.emit(i+1, 5) # len(seg_fnames))
             try:
                 get_angles_from_image(self.root_seg_dir, self.im_dataset_dir,
                                       self.seed_seg_dir,
@@ -67,25 +65,15 @@ class ProgressWatchThread(QThread):
             except Exception as error:
                 print(fname, error)
                 print('file_name,{error},NA,NA,NA,NA', file=error_file)
-                raise error
-
+                errors.append(error)
         time_str = humanize.naturaldelta(datetime.timedelta(seconds=time.time() - start))
         print('Extracting angles for', len(seg_fnames), 'images took', time_str)
+        self.done.emit(errors)
 
-        while True:
-            done_fnames = ls(self.output_dir)
-            count = len(done_fnames)
-            if count >= self.total_images:
-                self.done.emit()
-                break
-            else:
-                self.progress_change.emit(count, self.total_images)
-                time.sleep(0.2)
-
-
+            
 class ProgressWidget(BaseProgressWidget):
-    def __init__(self):
-        super().__init__('Extracting Angles')
+    def __init__(self, task):
+        super().__init__(task)
         self.watch_thread = None
 
     def run(self, root_seg_dir,
@@ -93,6 +81,8 @@ class ProgressWidget(BaseProgressWidget):
             max_seed_points_per_im, debug_image_dir,
             output_csv_path, error_csv_path,
             radius=300):
+
+        os.makedirs(debug_image_dir)
 
         self.watch_thread = ProgressWatchThread(root_seg_dir,
             im_dataset_dir, seed_seg_dir,
@@ -241,8 +231,10 @@ class SeminalRootAngleExtractor(QMainWindow):
 
 
     def extract_angles(self, output_folder):
-        print('extract angles')
-        self.progress_widget = ProgressWidget()
+        print('Extract angles')
+        self.progress_widget = ProgressWidget(f'Extracting angles to {output_folder}')
+        #self.progress_bar.setMaximum(len(ls(self.root_seg_dir)))
+        self.progress_bar.setMaximum(5)#len(ls(self.root_seg_dir)))
         self.progress_widget.run(root_seg_dir=self.root_seg_dir,
                                  im_dataset_dir=self.input_photo_dir,
                                  seed_seg_dir=self.seed_seg_dir,
