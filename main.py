@@ -2,7 +2,11 @@ import sys
 import os
 from extract import get_angles_from_image
 from PyQt6.QtCore import Qt, QDateTime, pyqtSignal, QThread
-from PyQt6.QtWidgets import QApplication, QMainWindow, QGridLayout, QPushButton, QFileDialog, QWidget, QLabel, QMessageBox, QProgressBar
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QGridLayout, QPushButton, 
+    QFileDialog, QWidget, QLabel, QMessageBox, QProgressBar,
+    QSpinBox
+)
 from progress_widget import BaseProgressWidget
 import time
 import datetime
@@ -120,17 +124,35 @@ class SeminalRootAngleExtractor(QMainWindow):
         self.create_input_dir_widgets("Seed Segmentation", self.select_seed_seg_folder, self.seed_seg_dir_label, 1)
         self.create_input_dir_widgets("Input Photo", self.select_input_photo_folder, self.input_photo_dir_label, 2)
 
+
+        # add widget to specify the number of seed points
+        label = QLabel(f"Max seed points per image:")
+        self.layout.addWidget(label, 4, 0, 1, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.seed_count_spinbox = QSpinBox()
+        self.seed_count_spinbox.setValue(2)
+        self.seed_count_spinbox.setMinimum(1)
+        self.layout.addWidget(self.seed_count_spinbox, 4, 1, 1, 3)
+
+
+        # add widget to specify the number of seed points
+        label = QLabel(f"Root angle radius:")
+        self.layout.addWidget(label, 5, 0, 1, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.radius_spinbox = QSpinBox()
+        self.radius_spinbox.setMaximum(9000)
+        self.radius_spinbox.setValue(300)
+        self.radius_spinbox.setMinimum(3)
+        self.layout.addWidget(self.radius_spinbox, 5, 1, 1, 3)
+
         # Create a folder selection button and label for the output directory
         self.create_output_dir_widgets("Output",
             self.select_output_folder, self.output_dir_label, 3)
 
         # Create a submit button
-
         self.submit_button = QPushButton("Extract angles")
         self.submit_button.clicked.connect(self.create_output_folder)
 
         #row: int, column: int, rowSpan: int, columnSpan: int, alignment: Qt.AlignmentFlag = Qt.Alignment()):
-        self.layout.addWidget(self.submit_button, 4, 0, 1, 4)
+        self.layout.addWidget(self.submit_button, 6, 0, 1, 4)
 
         self.root_seg_dir = ""
         self.seed_seg_dir = ""
@@ -232,7 +254,8 @@ class SeminalRootAngleExtractor(QMainWindow):
         self.progress_widget.run(root_seg_dir=self.root_seg_dir,
                                  im_dataset_dir=self.input_photo_dir,
                                  seed_seg_dir=self.seed_seg_dir,
-                                 max_seed_points_per_im=2,
+                                 max_seed_points_per_im=self.seed_count_spinbox.value(),
+                                 radius=self.radius_spinbox.value(),
                                  debug_image_dir=os.path.join(output_folder, 'debug_images'),
                                  output_csv_path=os.path.join(output_folder, 'angles.csv'),
                                  error_csv_path=os.path.join(output_folder, 'errors.csv'))
