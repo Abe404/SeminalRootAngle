@@ -269,7 +269,7 @@ class SeminalRootAngleExtractor(QMainWindow):
                                  debug_image_dir=os.path.join(output_folder, 'debug_images'),
                                  output_csv_path=os.path.join(output_folder, 'angles.csv'),
                                  error_csv_path=os.path.join(output_folder, 'errors.csv'),
-                                 output_debug_images=self.debug_image_checkbox.checkState())
+                                 output_debug_images=self.debug_image_checkbox.checkState() == Qt.CheckState.Checked)
 
         self.progress_widget.show()
         self.close()
