@@ -40,7 +40,7 @@ class DoneMessageWindow(QtWidgets.QWidget):
             label_msg += f'\n There were {len(errors)} error(s):'
             error_msg = ''
             for e in errors:
-                error_msg += '\n' + e
+                error_msg += '\n' + str(e)
             self.text_area = QtWidgets.QPlainTextEdit(self)
             self.layout.addWidget(self.text_area)
             self.text_area.insertPlainText(error_msg)
