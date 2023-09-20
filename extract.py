@@ -29,7 +29,7 @@ from skimage.draw import line_aa
 from skimage.draw import circle_perimeter
 from skimage.color import gray2rgb
 from skimage.transform import resize
-from skimage import img_as_float, img_as_ubyte
+from skimage import img_as_ubyte
 from PIL import Image, ImageFont, ImageDraw
 import humanize
 from matplotlib import font_manager
@@ -103,8 +103,6 @@ def get_merged_debug_im(debug_ims):
             #debug_im = img_as_float(debug_im)
             #print('image as float time', time.time() - t)
             #t = time.time()
-            from PIL import Image
-            import PIL
             debug_im = img_as_ubyte(debug_im)
             print(i, 'shape before', debug_im.shape)
             #if np.min(debug_im) < 0:
@@ -257,8 +255,6 @@ def get_primary_root_angle(seed_centroid, r, im, seg_im, seed_im, skel, save_deb
 
     if save_debug_image and len(props) < 2:
         return None, get_merged_debug_im(debug_ims), 'could not find two roots in local region'
-        print('time to get merged debug im', time.time() - t)
-        t = time.time()
 
     for region in props:
         if not smallest_x_region or (region.centroid[1] < smallest_x_region.centroid[1]):
@@ -342,8 +338,9 @@ def add_text(image, text, x, y):
 
 def get_angles_from_image(seg_dataset_dir, im_dataset_dir, seed_seg_dir,
                           max_seed_points_per_im,
-                          fname, r, csv_file, error_file,
-                          debug_image_dir, save_debug_image=False):
+                          r, csv_file, error_file,
+                          debug_image_dir, save_debug_image,
+                          fname):
     """
     Extract angles from {fname} and then save the output to csv_file
     and debug information to the debug_images folder.
@@ -414,6 +411,8 @@ def get_angles_from_image(seg_dataset_dir, im_dataset_dir, seed_seg_dir,
                                 img_as_ubyte(debug_image), quality=95)
             print('time to save debug image', time.time() - start)
 
+
+
 def extract_all_angles(root_seg_dir, im_dataset_dir,
                        seed_seg_dir, max_seed_points_per_im,
                        debug_image_dir,
@@ -445,9 +444,11 @@ def extract_all_angles(root_seg_dir, im_dataset_dir,
             get_angles_from_image(root_seg_dir, im_dataset_dir,
                                   seed_seg_dir,
                                   max_seed_points_per_im,
-                                  fname, radius,
+                                  radius,
                                   csv_file, error_file,
-                                  debug_image_dir, save_debug_image=True)
+                                  debug_image_dir,
+                                  save_debug_image=True,
+                                  fname=fname)
         except Exception as error:
             print(fname, error)
             print('file_name,{error},NA,NA,NA,NA', file=error_file)
