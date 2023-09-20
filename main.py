@@ -4,8 +4,8 @@ from extract import get_angles_from_image
 from PyQt6.QtCore import Qt, QDateTime, pyqtSignal, QThread
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QGridLayout, QPushButton, 
-    QFileDialog, QWidget, QLabel, QMessageBox, QProgressBar,
-    QSpinBox
+    QFileDialog, QWidget, QLabel, QMessageBox,
+    QSpinBox, QCheckBox
 )
 from progress_widget import BaseProgressWidget
 import time
@@ -33,7 +33,7 @@ class ProgressWatchThread(QThread):
             im_dataset_dir, seed_seg_dir,
             max_seed_points_per_im, debug_image_dir,
             output_csv_path, error_csv_path,
-            radius=300):
+            radius=300, output_debug_images=True):
         super().__init__()
 
         self.root_seg_dir = root_seg_dir
@@ -44,6 +44,7 @@ class ProgressWatchThread(QThread):
         self.output_csv_path = output_csv_path
         self.error_csv_path = error_csv_path
         self.radius = radius
+        self.output_debug_images = output_debug_images
 
     def run(self):
 
@@ -65,7 +66,8 @@ class ProgressWatchThread(QThread):
                                       self.max_seed_points_per_im,
                                       fname, self.radius,
                                       csv_file, error_file,
-                                      self.debug_image_dir)
+                                      self.debug_image_dir,
+                                      save_debug_image=self.output_debug_images)
             except Exception as error:
                 print(fname, error)
                 print('file_name,{error},NA,NA,NA,NA', file=error_file)
@@ -84,14 +86,14 @@ class ProgressWidget(BaseProgressWidget):
             im_dataset_dir, seed_seg_dir,
             max_seed_points_per_im, debug_image_dir,
             output_csv_path, error_csv_path,
-            radius=300):
+            radius=300, output_debug_images=True):
 
         os.makedirs(debug_image_dir)
 
         self.watch_thread = ProgressWatchThread(root_seg_dir,
             im_dataset_dir, seed_seg_dir,
             max_seed_points_per_im, debug_image_dir,
-            output_csv_path, error_csv_path, radius)
+            output_csv_path, error_csv_path, radius, output_debug_images)
 
         self.watch_thread.progress_change.connect(self.onCountChanged)
         self.watch_thread.done.connect(self.done)
@@ -143,6 +145,14 @@ class SeminalRootAngleExtractor(QMainWindow):
         self.radius_spinbox.setMinimum(3)
         self.layout.addWidget(self.radius_spinbox, 5, 1, 1, 3)
 
+         # add widget to specify the optional image output
+        label = QLabel(f"Output debug image (slower):")
+        self.layout.addWidget(label, 6, 0, 1, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.debug_image_checkbox = QCheckBox()
+        self.debug_image_checkbox.setCheckState(Qt.CheckState.Checked)
+        self.layout.addWidget(self.debug_image_checkbox, 6, 1, 1, 3)
+
+
         # Create a folder selection button and label for the output directory
         self.create_output_dir_widgets("Output",
             self.select_output_folder, self.output_dir_label, 3)
@@ -152,7 +162,7 @@ class SeminalRootAngleExtractor(QMainWindow):
         self.submit_button.clicked.connect(self.create_output_folder)
 
         #row: int, column: int, rowSpan: int, columnSpan: int, alignment: Qt.AlignmentFlag = Qt.Alignment()):
-        self.layout.addWidget(self.submit_button, 6, 0, 1, 4)
+        self.layout.addWidget(self.submit_button, 7, 0, 1, 4)
 
         self.root_seg_dir = ""
         self.seed_seg_dir = ""
@@ -258,7 +268,8 @@ class SeminalRootAngleExtractor(QMainWindow):
                                  radius=self.radius_spinbox.value(),
                                  debug_image_dir=os.path.join(output_folder, 'debug_images'),
                                  output_csv_path=os.path.join(output_folder, 'angles.csv'),
-                                 error_csv_path=os.path.join(output_folder, 'errors.csv'))
+                                 error_csv_path=os.path.join(output_folder, 'errors.csv'),
+                                 output_debug_images=self.debug_image_checkbox.checkState())
 
         self.progress_widget.show()
         self.close()
