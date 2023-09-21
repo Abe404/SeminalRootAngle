@@ -96,25 +96,15 @@ def get_merged_debug_im(debug_ims):
 
         f_debug_ims = []
 
-        for i, debug_im in enumerate(debug_ims[:4]):
+        for _i, debug_im in enumerate(debug_ims[:4]):
             new_w = 640
             new_h = round(debug_im.shape[0] * (640 / debug_im.shape[1]))
-            t = time.time()
-            #debug_im = img_as_float(debug_im)
-            #print('image as float time', time.time() - t)
-            #t = time.time()
+            _t = time.time()
             debug_im = img_as_ubyte(debug_im)
-            print(i, 'shape before', debug_im.shape)
-            #if np.min(debug_im) < 0:
-            #    debug_im = debug_im - np.min(debug_im) # start at 0
-            #debug_im = debug_im * (256 / np.max(debug_im)) # scale to 256
             debug_im = Image.fromarray(debug_im)
             #debug_im = np.array(debug_im.resize((new_w, new_h), PIL.Image.NEAREST))
             debug_im = np.array(debug_im.resize((new_w, new_h)))
-
-            print('shape after', debug_im.shape)
-            #debug_im = resize(debug_im, (new_h, new_w, 3), order=0)
-            print('resize time', time.time() - t)
+            #print('resize time', time.time() - t)
             debug_im = debug_im[:640, :640]
             # make sure debug im is at least 640        
             zero_im = np.zeros((640, 640, 3))
@@ -130,13 +120,11 @@ def get_merged_debug_im(debug_ims):
             zero_im = img_as_ubyte(zero_im)
             return zero_im
         
-        t = time.time() 
         merge1 = np.hstack((f_debug_ims[0],f_debug_ims[1],f_debug_ims[2],f_debug_ims[3]))
         merge2 = np.hstack((fixim(debug_ims[4]),fixim(debug_ims[5]),
                             fixim(debug_ims[6]),fixim(debug_ims[7])))
 
         merged = np.concatenate((merge1, merge2))
-        print('stack and concat time', time.time() - t)
         return merged
     except Exception as e:
         print('Exception creating image', e)
@@ -147,7 +135,7 @@ def get_primary_root_angle(seed_centroid, r, im, seg_im, seed_im, skel, save_deb
         TODO: refactor this function. It's way too long.
     """
     # dont modify in place.. it gets messy so make a copy.
-    t = time.time()
+    _t = time.time()
     seg_im = np.array(seg_im)
     seed_im = np.array(seed_im)
 
@@ -174,7 +162,6 @@ def get_primary_root_angle(seed_centroid, r, im, seg_im, seed_im, skel, save_deb
         cc = [min(max(c, 0), im.shape[1]-1) for c in cc]
         rgbskel[rr, cc, 0] =  255
         debug_ims.append(rgbskel)
-        print('time to get rgbskel', time.time() - t)
 
         # add circle to show location of extracted region
         im_y = round(seed_centroid[0] * im.shape[0])
@@ -194,16 +181,7 @@ def get_primary_root_angle(seed_centroid, r, im, seg_im, seed_im, skel, save_deb
         rr = [min(max(r, 0), im.shape[0]-1) for r in rr]
         cc = [min(max(c, 0), im.shape[1]-1) for c in cc]
         im[rr, cc, 0] =  255
-        
-        #print('im unique = ', np.unique(im))
-        #print('save im with circle draw')
-        # The circle is in entirely the wrong place.
-        # I tink the seed location is wrong!!
-        #save('circ.png', im)
-
         debug_ims.append(im)
-        print('time to get perimiter image', time.time() - t)
-
 
     # then take larger disk and set to 0 if outside
     rr, cc = disk((y, x), r-80)
@@ -224,8 +202,6 @@ def get_primary_root_angle(seed_centroid, r, im, seg_im, seed_im, skel, save_deb
     
     skel[mask < 1] = 0
 
-    #print('y start', y-(r+20), 'yend', y+(r+20))
-    #print('x start', x-(r+20), 'xend', x+(r+20))
     y_start = max(0, y-(r+20))
 
     if save_debug_image:
@@ -253,8 +229,10 @@ def get_primary_root_angle(seed_centroid, r, im, seg_im, seed_im, skel, save_deb
     label_img = label(skel)
     props = regionprops(label_img)
 
-    if save_debug_image and len(props) < 2:
-        return None, get_merged_debug_im(debug_ims), 'could not find two roots in local region'
+    if len(props) < 2:
+        if save_debug_image:
+            return None, get_merged_debug_im(debug_ims), 'could not find two roots in local region'
+        return None, None, 'could not find two roots in local region'
 
     for region in props:
         if not smallest_x_region or (region.centroid[1] < smallest_x_region.centroid[1]):
@@ -338,11 +316,14 @@ def add_text(image, text, x, y):
 
 def get_angles_from_image(seg_dataset_dir, im_dataset_dir, seed_seg_dir,
                           max_seed_points_per_im,
-                          r, csv_file, error_file,
-                          debug_image_dir, save_debug_image,
+                          r, debug_image_dir, save_debug_image,
+                          output_csv_path,
+                          error_csv_path,
                           fname):
+
+
     """
-    Extract angles from {fname} and then save the output to csv_file
+    Extract angles from {fname} 
     and debug information to the debug_images folder.
     """
     im = None
@@ -358,13 +339,9 @@ def get_angles_from_image(seg_dataset_dir, im_dataset_dir, seed_seg_dir,
             break
     if im is None:
         raise Exception(f'Cound not find photo for {fname} in {im_dataset_dir}')
-    start = time.time()    
     seg_im = imread(os.path.join(seg_dataset_dir, fname))[:, :, 3].astype(bool)
-    print('time to load seg im', time.time() - start)
 
-    start = time.time()    
     seed_im = imread(os.path.join(seed_seg_dir, fname))[:, :, 3].astype(bool)
-    print('time to load seed im', time.time() - start)
 
     ## change seed_im shape to be same size as seg_im. We assume its at the top of the image.
 
@@ -373,45 +350,40 @@ def get_angles_from_image(seg_dataset_dir, im_dataset_dir, seed_seg_dir,
     # i.e seed_im.shape[1] (width) is a scaled down version of seg_im.shape[1]
     scale_coef = seg_im.shape[1] / seed_im.shape[1]
     seed_im_new_height = round(seed_im.shape[0] * scale_coef)
-    start = time.time()    
     seed_im = resize(seed_im, (seed_im_new_height, seg_im.shape[1]))
-    print('time to resize seed im', time.time() - start)
 
-    start = time.time()    
     new_seed_im = np.zeros(seg_im.shape)
     # add seed im to the top of a blank image
     new_seed_im[:seed_im.shape[0], :seed_im.shape[1]] = seed_im.astype(int)
-    print('time to create new seed im', time.time() - start)
     seed_im = new_seed_im.astype(bool)
     skel = read_root_seg(seg_im)
 
-    start = time.time()    
     centroids, seed_masks, seed_pixels = load_seed_points(seed_im, max_seed_points_per_im)
-    print('time to load seed points', time.time() - start)
 
+    error_fnames = []
+    errors = []
     for i, (c, seed_mask, seed_size) in enumerate(zip(centroids, seed_masks, seed_pixels)):
 
-        start = time.time()    
         angle_degrees, debug_image, error = get_primary_root_angle(c, r, im, seg_im,
                                                                    seed_mask, skel, save_debug_image)
-        print('time to get seed point angle', time.time() - start)
-
         if angle_degrees:
-            print(f"{fname},{angle_degrees},{i},{c[1]},{c[0]},{seed_size}", file=csv_file)
+            print(f"{fname},{angle_degrees},{i},{c[1]},{c[0]},{seed_size}",
+                  file=open(output_csv_path, 'a'))
         if error:
-            print(f"{fname},{error},{i}")
-            print(f"{fname},{error},{i},{c[1]},{c[0]},{seed_size}", file=error_file)
+            print(f"'error:{fname},{error},{i}")
+            print(f"{fname},{error},{i},{c[1]},{c[0]},{seed_size}",
+                  file=open(error_csv_path, 'a'))
+            error_fnames.append(fname)
+            errors.append(error)
+
         if debug_image is not None:
             # strange rounding/precision error left something slightly larger than 1
             # so we now restrict to max of 1.0
             debug_image[debug_image > 1.0] = 1.0
-            start = time.time()    
             imsave(os.path.join(debug_image_dir,
                                 f"{fname.replace('.png', '')}_{i}.jpg"),
                                 img_as_ubyte(debug_image), quality=95)
-            print('time to save debug image', time.time() - start)
-
-
+    return error_fnames, errors
 
 def extract_all_angles(root_seg_dir, im_dataset_dir,
                        seed_seg_dir, max_seed_points_per_im,
@@ -431,13 +403,13 @@ def extract_all_angles(root_seg_dir, im_dataset_dir,
 
     seg_fnames = os.listdir(seed_seg_dir)
     seg_fnames = [s for s in seg_fnames if '.png' in s]
+
+    print("file_name,angle_degrees,seed_index,seed_x,seed_y,seed_pixels",
+          file=open(output_csv_path, 'w+'))
+
+    print("file_name,error_message,seed_index,seed_x,seed_y,seed_pixels",
+          file=open(error_csv_path, 'w+'))
     start = time.time()
-
-    csv_file = open(output_csv_path, 'w+')
-    error_file = open(error_csv_path, 'w+')
-    print("file_name,angle_degrees,seed_index,seed_x,seed_y,seed_pixels", file=csv_file)
-    print("file_name,error_message,seed_index,seed_x,seed_y,seed_pixels", file=error_file)
-
     for fname in seg_fnames:
         print(f"Extracting angles:{seg_fnames.index(fname) + 1}/{len(seg_fnames)}", fname)
         try:
@@ -445,13 +417,16 @@ def extract_all_angles(root_seg_dir, im_dataset_dir,
                                   seed_seg_dir,
                                   max_seed_points_per_im,
                                   radius,
-                                  csv_file, error_file,
                                   debug_image_dir,
                                   save_debug_image=True,
+                                  output_csv_path=output_csv_path,
+                                  error_csv_path=error_csv_path,
                                   fname=fname)
+
+        # csv_file, error_file,
         except Exception as error:
             print(fname, error)
-            print('file_name,{error},NA,NA,NA,NA', file=error_file)
+            print('file_name,{error},NA,NA,NA,NA', file=open(error_csv_path, 'a'))
             raise error
 
     time_str = humanize.naturaldelta(datetime.timedelta(seconds=time.time() - start))
