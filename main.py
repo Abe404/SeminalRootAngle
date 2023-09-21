@@ -50,9 +50,17 @@ class ProgressWatchThread(QThread):
 
     def run(self):
 
+
         seg_fnames = os.listdir(self.seed_seg_dir)
         seg_fnames = [s for s in seg_fnames if '.png' in s]
         start = time.time()
+
+
+        # give progress update to show something is happening.
+        print(f"Extracting angles:1/{len(seg_fnames)}")
+        self.progress_change.emit(1, len(seg_fnames))
+
+
 
         print("file_name,angle_degrees,seed_index,seed_x,seed_y,seed_pixels",
               file=open(self.output_csv_path, 'w+'))
@@ -78,8 +86,7 @@ class ProgressWatchThread(QThread):
                     self.error_csv_path
                 ],
                 fnames=seg_fnames,
-                progress_hook=hook,
-                chunk_size=8)
+                progress_hook=hook)
             errors = []
             for m_fnames, m_errors in mp_results: # list of lists of errors
                 for f, e in zip(m_fnames, m_errors):
