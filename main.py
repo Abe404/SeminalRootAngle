@@ -54,40 +54,55 @@ class ProgressWatchThread(QThread):
         seg_fnames = [s for s in seg_fnames if '.png' in s]
         start = time.time()
 
-        csv_file = open(self.output_csv_path, 'w+')
-        error_file = open(self.error_csv_path, 'w+')
-        print("file_name,angle_degrees,seed_index,seed_x,seed_y,seed_pixels", file=csv_file)
-        print("file_name,error_message,seed_index,seed_x,seed_y,seed_pixels", file=error_file)
+        print("file_name,angle_degrees,seed_index,seed_x,seed_y,seed_pixels",
+              file=open(self.output_csv_path, 'w+'))
+
+        print("file_name,error_message,seed_index,seed_x,seed_y,seed_pixels",
+              file=open(self.error_csv_path, 'w+'))
         errors = []
 
+        def hook(step):
+            print(f"Extracting angles:{step + 1}/{len(seg_fnames)}")
+            self.progress_change.emit(step+1, len(seg_fnames))
+
         if self.multiprocess:
-            sys_utils.multi_process(
+            mp_results = sys_utils.multi_process(
                 func=get_angles_from_image,
                 repeat_args=[
                     self.root_seg_dir, self.im_dataset_dir,
                     self.seed_seg_dir, self.max_seed_points_per_im,
-                    self.radius, csv_file, error_file,
+                    self.radius, 
                     self.debug_image_dir,
-                    self.output_debug_images
+                    self.output_debug_images,
+                    self.output_csv_path,
+                    self.error_csv_path
                 ],
-                fnames=seg_fnames)
-
+                fnames=seg_fnames,
+                progress_hook=hook,
+                chunk_size=8)
+            errors = []
+            for m_fnames, m_errors in mp_results: # list of lists of errors
+                for f, e in zip(m_fnames, m_errors):
+                    errors.append(f'File: {f}, Error: {e}')
         else:
+            errors = []
             for i, fname in enumerate(seg_fnames):
                 print(f"Extracting angles:{i + 1}/{len(seg_fnames)}", fname)
+                print(i+1, len(seg_fnames))
                 self.progress_change.emit(i+1, len(seg_fnames))
                 try:
                     get_angles_from_image(self.root_seg_dir, self.im_dataset_dir,
                                           self.seed_seg_dir,
                                           self.max_seed_points_per_im,
                                           self.radius,
-                                          csv_file, error_file,
                                           self.debug_image_dir,
-                                          save_debug_image=self.output_debug_images,
-                                          fname=fname)
+                                          self.output_debug_images,
+                                          fname,
+                                          self.output_csv_path,
+                                          self.error_csv_path)
                 except Exception as error:
                     print(fname, error)
-                    print('file_name,{error},NA,NA,NA,NA', file=error_file)
+                    print('file_name,{error},NA,NA,NA,NA', file=open(self.error_csv_path, 'a'))
                     errors.append(error)
         time_str = humanize.naturaldelta(datetime.timedelta(seconds=time.time() - start))
         print('Extracting angles for', len(seg_fnames), 'images took', time_str)
@@ -107,11 +122,13 @@ class ProgressWidget(BaseProgressWidget):
 
         os.makedirs(debug_image_dir)
 
+        self.progress_bar.setMaximum(len(ls(root_seg_dir)))
+
         self.watch_thread = ProgressWatchThread(root_seg_dir,
             im_dataset_dir, seed_seg_dir,
             max_seed_points_per_im, debug_image_dir,
             output_csv_path, error_csv_path, radius, output_debug_images)
-
+        
         self.watch_thread.progress_change.connect(self.onCountChanged)
         self.watch_thread.done.connect(self.done)
         self.watch_thread.start()
@@ -121,8 +138,6 @@ class SeminalRootAngleExtractor(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        print('init sys.argv', sys.argv)
-        
         self.progress_widget = None
 
         self.setWindowTitle("Seminal Root Angle Extractor")
@@ -144,18 +159,6 @@ class SeminalRootAngleExtractor(QMainWindow):
         self.create_input_dir_widgets("Seed Segmentation", self.select_seed_seg_folder, self.seed_seg_dir_label, 1)
         self.create_input_dir_widgets("Input Photo", self.select_input_photo_folder, self.input_photo_dir_label, 2)
 
-        if len(sys.argv > 3):
-            self.input_photo_dir = sys.argv[1]
-            self.input_photo_dir_label.setText(self.input_photo_dir)
-
-            self.root_seg_dir = sys.argv[2]
-            self.root_seg_dir_label.setText(self.root_seg_dir)
-
-            self.seed_seg_dir = sys.argv[3]
-            self.seed_seg_dir_label.setText(self.seed_seg_dir)
-
-            self.output_dir = sys.argv[4]
-            self.output_dir_label.setText(self.output_dir)
 
         # add widget to specify the number of seed points
         label = QLabel(f"Max seed points per image:")
@@ -198,6 +201,20 @@ class SeminalRootAngleExtractor(QMainWindow):
         self.seed_seg_dir = ""
         self.input_photo_dir = ""
         self.output_dir = ""
+
+        if len(sys.argv) > 3:
+            self.root_seg_dir = sys.argv[1]
+            self.root_seg_dir_label.setText(self.root_seg_dir)
+
+            self.seed_seg_dir = sys.argv[2]
+            self.seed_seg_dir_label.setText(self.seed_seg_dir)
+
+            self.input_photo_dir = sys.argv[3]
+            self.input_photo_dir_label.setText(self.input_photo_dir)
+
+            self.output_dir = sys.argv[4]
+            self.output_dir_label.setText(self.output_dir)
+
 
     def create_input_dir_widgets(self, label_text, select_function, dir_label, row):
         label = QLabel(f"{label_text} Directory:")
@@ -291,7 +308,6 @@ class SeminalRootAngleExtractor(QMainWindow):
     def extract_angles(self, output_folder):
         print('Extract angles')
         self.progress_widget = ProgressWidget(f'Extracting angles to {output_folder}')
-
         checked = (self.debug_image_checkbox.checkState() == Qt.CheckState.Checked)
         self.progress_widget.run(root_seg_dir=self.root_seg_dir,
                                  im_dataset_dir=self.input_photo_dir,
