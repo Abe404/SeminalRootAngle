@@ -19,7 +19,7 @@ import time
 import os
 from multiprocessing import Pool
 
-def multi_process(func, repeat_args, fnames, chunk_size=None,
+def multi_process(func, repeat_args, fnames, 
                   progress_hook=None, cpus=os.cpu_count()):
     """
     Use multiprocess pool to exec func.
@@ -29,14 +29,12 @@ def multi_process(func, repeat_args, fnames, chunk_size=None,
     """
     print('calling', func.__name__, 'on', len(fnames), 'images')
     start = time.time()
-
-    if chunk_size is None:
-        chunk_size = len(fnames)
-
+    
+    chunk_size = cpus
     results = []
 
     for i in range(0, len(fnames), chunk_size):
-        pool = Pool(cpus)
+        pool = Pool(chunk_size)
         async_results = []
         chunk = fnames[i:i+chunk_size]
         for fname in chunk:
@@ -48,5 +46,6 @@ def multi_process(func, repeat_args, fnames, chunk_size=None,
             results.append(res.get())
         if progress_hook is not None:
             progress_hook(i)
+
     print(func.__name__, 'on', len(fnames), 'images took', time.time() - start)
     return results
