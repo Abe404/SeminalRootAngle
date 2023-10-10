@@ -28,7 +28,7 @@ class ProgressWatchThread(QThread):
     Runs another thread.
     """
     progress_change = pyqtSignal(int, int)
-    done = pyqtSignal(list)
+    done = pyqtSignal(str, list)
 
     def __init__(self, root_seg_dir,
             im_dataset_dir, seed_seg_dir,
@@ -51,10 +51,9 @@ class ProgressWatchThread(QThread):
     def run(self):
 
 
-        seg_fnames = os.listdir(self.seed_seg_dir)
+        seg_fnames = [os.listdir(self.seed_seg_dir)[0]]
         seg_fnames = [s for s in seg_fnames if '.png' in s]
         start = time.time()
-
 
         # give progress update to show something is happening.
         print(f"Extracting angles:1/{len(seg_fnames)}")
@@ -113,7 +112,7 @@ class ProgressWatchThread(QThread):
                     errors.append(error)
         time_str = humanize.naturaldelta(datetime.timedelta(seconds=time.time() - start))
         print('Extracting angles for', len(seg_fnames), 'images took', time_str)
-        self.done.emit(errors)
+        self.done.emit(os.path.dirname(self.output_csv_path), errors)
 
             
 class ProgressWidget(BaseProgressWidget):
@@ -325,7 +324,6 @@ class SeminalRootAngleExtractor(QMainWindow):
                                  output_csv_path=os.path.join(output_folder, 'angles.csv'),
                                  error_csv_path=os.path.join(output_folder, 'errors.csv'),
                                  output_debug_images=checked)
-
         self.progress_widget.show()
         self.close()
 

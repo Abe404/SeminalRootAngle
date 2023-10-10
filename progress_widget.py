@@ -22,16 +22,32 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
 import time
+import sys
+import os
+import subprocess
 from PyQt6 import QtWidgets
 from humanfriendly import format_timespan
 
 
 class DoneMessageWindow(QtWidgets.QWidget):
+    
+    
+    def close_clicked(self):
+        # open output dir
+        if sys.platform == "darwin": # Mac/OSX
+            subprocess.call(['open', self.output_dir])
+        elif sys.platform == 'win32': # Windows
+            os.startfile(self.output_dir)
+        else: # assume linux/ubuntu
+            subprocess.call(['xdg-open', self.output_dir])
+        # close this window
+        self.close()
 
-    def __init__(self, _parent, task, errors=None):
+    def __init__(self, _parent, task, output_dir, errors=None):
         super().__init__()
         self.layout = QtWidgets.QVBoxLayout(self)
         self.label = QtWidgets.QLabel(self)
+        self.output_dir = output_dir
 
         self.layout.addWidget(self.label)
         label_msg = f'{task} complete \n'
@@ -47,9 +63,9 @@ class DoneMessageWindow(QtWidgets.QWidget):
             self.setGeometry(200, 200, 500, 400)
 
         self.label.setText(label_msg)
-        self.ok_button = QtWidgets.QPushButton("ok")
+        self.ok_button = QtWidgets.QPushButton("Open output folder")
         self.layout.addWidget(self.ok_button)
-        self.ok_button.clicked.connect(self.close)
+        self.ok_button.clicked.connect(self.close_clicked)
         self.setLayout(self.layout)
 
 
@@ -105,7 +121,8 @@ class BaseProgressWidget(QtWidgets.QWidget):
                                     f'{format_timespan(seconds_remaining)}')
         self.progress_bar.setValue(value)
 
-    def done(self, errors=None):
-        self.done_window = DoneMessageWindow(self, self.task, errors)
+    def done(self, output_dir, errors=None):
+        self.done_window = DoneMessageWindow(self, self.task, output_dir, errors)
         self.done_window.show()
+
         self.close()
