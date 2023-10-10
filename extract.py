@@ -35,6 +35,8 @@ import humanize
 from matplotlib import font_manager
 
 def save(impath, im):
+
+    im = im.astype(np.uint8)
     # what a hassle. why do we have to do this crap?
     new_p = Image.fromarray(im)
     if new_p.mode != 'RGB':
@@ -81,6 +83,25 @@ def load_seed_points(seg_im, max_seed_points):
             seed_masks[:max_seed_points],
             pixel_counts[:max_seed_points])
 
+
+def fix_first_row_im(debug_im):
+    new_w = 640
+    new_h = round(debug_im.shape[0] * (640 / debug_im.shape[1]))
+    _t = time.time()
+    assert np.max(debug_im) <= 1.0, 'expected float input'
+    debug_im = (debug_im * 255).astype(np.uint8)
+    debug_im = Image.fromarray(debug_im)
+    #debug_im = np.array(debug_im.resize((new_w, new_h), PIL.Image.NEAREST))
+    debug_im = np.array(debug_im.resize((new_w, new_h)))
+    #print('resize time', time.time() - t)
+    debug_im = debug_im[:640, :640]
+    # make sure debug im is at least 640        
+    zero_im = np.zeros((640, 640, 3))
+    zero_im[:debug_im.shape[0], :debug_im.shape[1]] = debug_im
+    debug_im = zero_im
+    return debug_im
+
+
 def get_merged_debug_im(debug_ims):
     """ convert debug images to one image.
         assumes first 4 could be any size and last 4
@@ -94,24 +115,6 @@ def get_merged_debug_im(debug_ims):
         if to_add > 0:
             print('adding', to_add, 'debug_ims len is now', len(debug_ims))
 
-        f_debug_ims = []
-
-        for _i, debug_im in enumerate(debug_ims[:4]):
-            new_w = 640
-            new_h = round(debug_im.shape[0] * (640 / debug_im.shape[1]))
-            _t = time.time()
-            debug_im = img_as_ubyte(debug_im)
-            debug_im = Image.fromarray(debug_im)
-            #debug_im = np.array(debug_im.resize((new_w, new_h), PIL.Image.NEAREST))
-            debug_im = np.array(debug_im.resize((new_w, new_h)))
-            #print('resize time', time.time() - t)
-            debug_im = debug_im[:640, :640]
-            # make sure debug im is at least 640        
-            zero_im = np.zeros((640, 640, 3))
-            zero_im[:debug_im.shape[0], :debug_im.shape[1]] = debug_im
-            debug_im = zero_im
-            f_debug_ims.append(debug_im)
-
         def fixim(im):
             im = im[:640, :640]
             # make sure debug im is at least 640        
@@ -120,11 +123,14 @@ def get_merged_debug_im(debug_ims):
             zero_im = img_as_ubyte(zero_im)
             return zero_im
         
-        merge1 = np.hstack((f_debug_ims[0],f_debug_ims[1],f_debug_ims[2],f_debug_ims[3]))
+        merge1 = np.hstack((debug_ims[0], debug_ims[1], debug_ims[2], debug_ims[3]))
         merge2 = np.hstack((fixim(debug_ims[4]),fixim(debug_ims[5]),
                             fixim(debug_ims[6]),fixim(debug_ims[7])))
 
         merged = np.concatenate((merge1, merge2))
+        print('merged min', np.min(merged), 'max', np.max(merged), 'dtype', merged.dtype)
+
+        save('merged.png', merged)
         return merged
     except Exception as e:
         print('Exception creating image', e)
@@ -140,13 +146,14 @@ def get_primary_root_angle(seed_centroid, r, im, seg_im, seed_im, skel, save_deb
     seed_im = np.array(seed_im)
 
     skel = np.array(skel)
-    im = np.array(im)
+    im = np.array(im).astype(float)
+    im /= np.max(im)
     mask = np.zeros(skel.shape)
 
     debug_ims = []
     if save_debug_image:
-        debug_ims.append(gray2rgb(seg_im))
-        debug_ims.append(gray2rgb(seed_im))
+        debug_ims.append(fix_first_row_im(gray2rgb(seg_im)))
+        debug_ims.append(fix_first_row_im(gray2rgb(seed_im)))
 
     y = round(seed_centroid[0] * seed_im.shape[0])
     x = round(seed_centroid[1] * seed_im.shape[1])
@@ -160,7 +167,10 @@ def get_primary_root_angle(seed_centroid, r, im, seg_im, seed_im, skel, save_deb
         # make sure they are inside the image to avoid an error.
         rr = [min(max(r, 0), im.shape[0]-1) for r in rr]
         cc = [min(max(c, 0), im.shape[1]-1) for c in cc]
-        rgbskel[rr, cc, 0] =  255
+        rgbskel = rgbskel.astype(np.uint)
+        rgbskel[rr, cc, 0] = 1.0
+        rgbskel = fix_first_row_im(rgbskel)
+        rgbskel[rgbskel > 0] = 255 # makes lines appear thicker and easier to see.
         debug_ims.append(rgbskel)
 
         # add circle to show location of extracted region
@@ -173,14 +183,23 @@ def get_primary_root_angle(seed_centroid, r, im, seg_im, seed_im, skel, save_deb
         # make sure they are inside the image to avoid an error.
         rr = [min(max(r, 0), im.shape[0]-1) for r in rr]
         cc = [min(max(c, 0), im.shape[1]-1) for c in cc]
-        im[rr, cc, 0] =  255
+
+        # create a red line image, so I can brighten it a bit by setting any pixel above 0 to max value.
+        red_line_im = np.zeros(im.shape)
+
+        red_line_im[rr, cc, 0] =  1.0
         
         rr, cc  = circle_perimeter(im_y, im_x, im_r)
         rr = [r if r > im_y else im_y for r in rr] # semi circle will be used.
         # make sure they are inside the image to avoid an error.
         rr = [min(max(r, 0), im.shape[0]-1) for r in rr]
         cc = [min(max(c, 0), im.shape[1]-1) for c in cc]
-        im[rr, cc, 0] =  255
+
+        red_line_im[rr, cc, 0] =  1.0
+
+        red_im = fix_first_row_im(red_line_im)
+        im = fix_first_row_im(im)
+        im[red_im > 0] = 255
         debug_ims.append(im)
 
     # then take larger disk and set to 0 if outside
@@ -206,8 +225,6 @@ def get_primary_root_angle(seed_centroid, r, im, seg_im, seed_im, skel, save_deb
 
     if save_debug_image:
         debug_ims.append(gray2rgb(skel[y_start:y+(r+20), x-(r+20):x+(r+20)]))
-
-
 
     # hide smaller disk. Note, this was previously r-40
     rr, cc = disk((y, x), r-80)
@@ -379,10 +396,9 @@ def get_angles_from_image(seg_dataset_dir, im_dataset_dir, seed_seg_dir,
         if debug_image is not None:
             # strange rounding/precision error left something slightly larger than 1
             # so we now restrict to max of 1.0
-            debug_image[debug_image > 1.0] = 1.0
             imsave(os.path.join(debug_image_dir,
                                 f"{fname.replace('.png', '')}_{i}.jpg"),
-                                img_as_ubyte(debug_image), quality=95)
+                                debug_image.astype(np.uint8), quality=95)
     return error_fnames, errors
 
 def extract_all_angles(root_seg_dir, im_dataset_dir,
