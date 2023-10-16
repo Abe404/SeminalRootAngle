@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QSpinBox, QCheckBox
 )
 from progress_widget import BaseProgressWidget
+from menu import add_menu_bar
 import time
 import datetime
 import humanize
@@ -154,6 +155,9 @@ class SeminalRootAngleExtractor(QMainWindow):
 
         self.layout = QGridLayout()
         self.central_widget.setLayout(self.layout)
+
+ 
+        add_menu_bar(self)
 
         self.root_seg_dir_label = QLabel("Root Segmentation Directory: None")
         self.seed_seg_dir_label = QLabel("Seed Segmentation Directory: None")

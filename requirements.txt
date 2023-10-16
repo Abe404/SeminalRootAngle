@@ -3,3 +3,4 @@ numpy
 humanize
 humanfriendly
 scikit-image
+matplotlib
