@@ -1,0 +1,5 @@
+Package: SeminalRootAngleExtractor
+Version: 1
+Architecture: i386
+Maintainer: Abraham George Smith ags@di.ku.dk
+Description: SeminalRootAngleExtractor enables the rapid extraction of seminal root angles from rhizobox images

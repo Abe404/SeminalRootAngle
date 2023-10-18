@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=SeminalRootAngleExtractor
+Comment=SeminalRootAngleExtractor
+Exec=/usr/local/bin/SeminalRootAngleExtractor/SeminalRootAngleExtractor
+Terminal=false
+Type=Application
+Icon=/usr/local/bin/SeminalRootAngleExtractor/icons/icon.svg
