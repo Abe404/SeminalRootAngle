@@ -113,7 +113,7 @@ run_args.append('--osx-bundle-identifier')
 run_args.append('com.seminalrootangleextractor')
 
 # scriptname: Name of scriptfile to be processed.
-run_args.append(os.path.join('src', 'main', 'python', 'main.py'))
+run_args.append(os.path.join('main.py'))
 
 PyInstaller.__main__.run(run_args)
 
