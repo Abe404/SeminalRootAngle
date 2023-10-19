@@ -36,7 +36,6 @@ jobs:
 
     - name: Install dependencies
       run: |
-        cd painter
         brew install create-dmg
         python -m pip install --upgrade pip
         python -m venv env
@@ -47,18 +46,16 @@ jobs:
 
     - name: Build software
       run: |
-        cd painter
         source env/bin/activate
         python build_scripts/run_pyinstaller.py
 
     - name: Make installer
       run: |
-        cd painter
         pkgbuild --component dist/SeminalRootAngleExtractor.app --install-location /Applications dist/SeminalRootAngleExtractor.pkg
 
     - name: Upload package
       uses: actions/upload-artifact@v2
       with:
         name: Package
-        path: ${{github.workspace}}/painter/dist/SeminalRootAngleExtractor.pkg
+        path: ${{github.workspace}}/dist/SeminalRootAngleExtractor.pkg
         if-no-files-found: error

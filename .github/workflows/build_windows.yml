@@ -38,21 +38,19 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install pyinstaller==5.4.1
-        pip install -r painter/requirements.txt
+        pip install -r requirements.txt
 
     - name: Build software
       run: |
-        cd painter
         python build_scripts/run_pyinstaller.py
 
     - name: Make installer
       run: |
-        cd painter
         makensis.exe build_scripts/assets/Installer.nsi
 
     - name: Upload package
       uses: actions/upload-artifact@v2
       with:
         name: Package
-        path: ${{github.workspace}}/painter/dist/SeminalRootAngleExtractorInstaller.exe
+        path: ${{github.workspace}}/dist/SeminalRootAngleExtractorInstaller.exe
         if-no-files-found: error
