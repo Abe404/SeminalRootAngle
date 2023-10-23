@@ -80,7 +80,7 @@ FunctionEnd
   "Software\Microsoft\Windows\CurrentVersion\Uninstall\SeminalRootAngleExtractor"
 Section
   SetOutPath "$InstDir"
-  File /r "..\..\..\dist\SeminalRootAngleExtractor\*"
+  File /r "..\..\dist\SeminalRootAngleExtractor\*"
   WriteRegStr SHCTX "Software\SeminalRootAngleExtractor" "" $InstDir
   WriteUninstaller "$InstDir\uninstall.exe"
   CreateShortCut "$SMPROGRAMS\SeminalRootAngleExtractor.lnk" "$InstDir\SeminalRootAngleExtractor.exe"
