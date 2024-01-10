@@ -147,7 +147,7 @@ class SeminalRootAngleExtractor(QMainWindow):
 
         self.progress_widget = None
 
-        self.setWindowTitle("Seminal Root Angle Extractor")
+        self.setWindowTitle("Seminal Root Angle")
         #self.setGeometry(100, 100, 400, 450)
 
         self.central_widget = QWidget()
