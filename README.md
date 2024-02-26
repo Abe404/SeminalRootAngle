@@ -1,4 +1,4 @@
-# SeminalRootAngleExtractor
+# SeminalRootAngle
 GUI application to measure seminal root angle from segmentations
 
 ### Development and Build process
