@@ -1,6 +1,11 @@
 # SeminalRootAngle
 GUI application to measure seminal root angle from segmentations
 
+# Installers. 
+
+Mac and windows installers are available from:
+https://github.com/Abe404/SeminalRootAngle/actions
+
 ### Development and Build process
 The application is developed and built with python 3.9
 
