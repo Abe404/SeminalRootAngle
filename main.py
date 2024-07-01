@@ -35,7 +35,8 @@ class ProgressWatchThread(QThread):
             im_dataset_dir, seed_seg_dir,
             max_seed_points_per_im, debug_image_dir,
             output_csv_path, error_csv_path,
-            radius=300, output_debug_images=True):
+            inner_radius=220, outer_radius=300,
+            output_debug_images=True):
         super().__init__()
 
         self.root_seg_dir = root_seg_dir
@@ -45,22 +46,19 @@ class ProgressWatchThread(QThread):
         self.debug_image_dir = debug_image_dir
         self.output_csv_path = output_csv_path
         self.error_csv_path = error_csv_path
-        self.radius = radius
+        self.inner_radius = inner_radius
+        self.outer_radius = outer_radius
         self.output_debug_images = output_debug_images
         self.multiprocess = True
 
     def run(self):
-
-
-        seg_fnames = [os.listdir(self.seed_seg_dir)[0]]
+        seg_fnames = os.listdir(self.seed_seg_dir)
         seg_fnames = [s for s in seg_fnames if '.png' in s]
         start = time.time()
 
         # give progress update to show something is happening.
         print(f"Extracting angles:1/{len(seg_fnames)}")
         self.progress_change.emit(1, len(seg_fnames))
-
-
 
         print("file_name,angle_degrees,seed_index,seed_x,seed_y,seed_pixels",
               file=open(self.output_csv_path, 'w+'))
@@ -79,7 +77,8 @@ class ProgressWatchThread(QThread):
                 repeat_args=[
                     self.root_seg_dir, self.im_dataset_dir,
                     self.seed_seg_dir, self.max_seed_points_per_im,
-                    self.radius, 
+                    self.inner_radius, 
+                    self.outer_radius, 
                     self.debug_image_dir,
                     self.output_debug_images,
                     self.output_csv_path,
@@ -98,18 +97,20 @@ class ProgressWatchThread(QThread):
                 print(i+1, len(seg_fnames))
                 self.progress_change.emit(i+1, len(seg_fnames))
                 try:
-                    get_angles_from_image(self.root_seg_dir, self.im_dataset_dir,
+                    get_angles_from_image(self.root_seg_dir,
+                                          self.im_dataset_dir,
                                           self.seed_seg_dir,
                                           self.max_seed_points_per_im,
-                                          self.radius,
+                                          self.inner_radius,
+                                          self.outer_radius,
                                           self.debug_image_dir,
                                           self.output_debug_images,
-                                          fname,
                                           self.output_csv_path,
-                                          self.error_csv_path)
+                                          self.error_csv_path,
+                                          fname)
                 except Exception as error:
                     print(fname, error)
-                    print('file_name,{error},NA,NA,NA,NA', file=open(self.error_csv_path, 'a'))
+                    print(f'{fname},{error},NA,NA,NA,NA', file=open(self.error_csv_path, 'a'))
                     errors.append(error)
         time_str = humanize.naturaldelta(datetime.timedelta(seconds=time.time() - start))
         print('Extracting angles for', len(seg_fnames), 'images took', time_str)
@@ -125,16 +126,21 @@ class ProgressWidget(BaseProgressWidget):
             im_dataset_dir, seed_seg_dir,
             max_seed_points_per_im, debug_image_dir,
             output_csv_path, error_csv_path,
-            radius=300, output_debug_images=True):
+            inner_radius=220, outer_radius=300,
+            output_debug_images=True):
 
         os.makedirs(debug_image_dir)
 
         self.progress_bar.setMaximum(len(ls(root_seg_dir)))
+        print('Extracting angles from', len(ls(root_seg_dir)), 'files')
 
         self.watch_thread = ProgressWatchThread(root_seg_dir,
             im_dataset_dir, seed_seg_dir,
             max_seed_points_per_im, debug_image_dir,
-            output_csv_path, error_csv_path, radius, output_debug_images)
+            output_csv_path, error_csv_path,
+            inner_radius,
+            outer_radius,
+            output_debug_images)
         
         self.watch_thread.progress_change.connect(self.onCountChanged)
         self.watch_thread.done.connect(self.done)
@@ -178,22 +184,42 @@ class SeminalRootAngleExtractor(QMainWindow):
         self.seed_count_spinbox.setMinimum(1)
         self.layout.addWidget(self.seed_count_spinbox, 4, 1, 1, 3)
 
+        # add label explaining root angle from disk 
+        label = QLabel("Root angle is calculated between three points: the seed point centroid "
+                       "and the centroids of two root segments. The root segments used for computing "
+                       "the angle are the ones on the furthest right and furthest left within a "
+                       "disk defined by a specified inner and outer radius. The radii are "
+                       "specified in pixels, as per segmentation file.")
+        self.layout.addWidget(label, 5, 0, 1, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        label.setWordWrap(True)
+
 
         # add widget to specify the number of seed points
-        label = QLabel(f"Root angle radius:")
-        self.layout.addWidget(label, 5, 0, 1, 1, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.radius_spinbox = QSpinBox()
-        self.radius_spinbox.setMaximum(9000)
-        self.radius_spinbox.setValue(300)
-        self.radius_spinbox.setMinimum(3)
-        self.layout.addWidget(self.radius_spinbox, 5, 1, 1, 3)
+        label = QLabel(f"Inner radius of root segment disk:")
+        self.layout.addWidget(label, 6, 0, 1, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.inner_radius_spinbox = QSpinBox()
+        self.inner_radius_spinbox.setMaximum(9000)
+        self.inner_radius_spinbox.setValue(220)
+        self.inner_radius_spinbox.setMinimum(3)
+        self.layout.addWidget(self.inner_radius_spinbox, 6, 1, 1, 3)
+
+
+        label = QLabel(f"Outer radius of root segment disk:")
+        self.layout.addWidget(label, 7, 0, 1, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.outer_radius_spinbox = QSpinBox()
+        self.outer_radius_spinbox.setMaximum(9000)
+        self.outer_radius_spinbox.setValue(300)
+        self.outer_radius_spinbox.setMinimum(3)
+        self.layout.addWidget(self.outer_radius_spinbox, 7, 1, 1, 3)
+
+
 
          # add widget to specify the optional image output
         label = QLabel(f"Output debug image (slower):")
-        self.layout.addWidget(label, 6, 0, 1, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.layout.addWidget(label, 8, 0, 1, 1, alignment=Qt.AlignmentFlag.AlignLeft)
         self.debug_image_checkbox = QCheckBox()
         self.debug_image_checkbox.setCheckState(Qt.CheckState.Checked)
-        self.layout.addWidget(self.debug_image_checkbox, 6, 1, 1, 3)
+        self.layout.addWidget(self.debug_image_checkbox, 8, 1, 1, 3)
 
 
         # Create a folder selection button and label for the output directory
@@ -205,7 +231,7 @@ class SeminalRootAngleExtractor(QMainWindow):
         self.submit_button.clicked.connect(self.create_output_folder)
 
         #row: int, column: int, rowSpan: int, columnSpan: int, alignment: Qt.AlignmentFlag = Qt.Alignment()):
-        self.layout.addWidget(self.submit_button, 7, 0, 1, 4)
+        self.layout.addWidget(self.submit_button, 9, 0, 1, 4)
 
         self.root_seg_dir = ""
         self.seed_seg_dir = ""
@@ -317,13 +343,20 @@ class SeminalRootAngleExtractor(QMainWindow):
 
     def extract_angles(self, output_folder):
         print('Extract angles')
+
+
+        print('Found ', len(ls(self.root_seg_dir)), 'root seg files')
+        print('Found ', len(ls(self.seed_seg_dir)), 'seed seg files')
+        print('Found ', len(ls(self.input_photo_dir)), 'input photo files')
+
         self.progress_widget = ProgressWidget(f'Extracting angles to {output_folder}')
         checked = (self.debug_image_checkbox.checkState() == Qt.CheckState.Checked)
         self.progress_widget.run(root_seg_dir=self.root_seg_dir,
                                  im_dataset_dir=self.input_photo_dir,
                                  seed_seg_dir=self.seed_seg_dir,
                                  max_seed_points_per_im=self.seed_count_spinbox.value(),
-                                 radius=self.radius_spinbox.value(),
+                                 inner_radius=self.inner_radius_spinbox.value(),
+                                 outer_radius=self.outer_radius_spinbox.value(),
                                  debug_image_dir=os.path.join(output_folder, 'debug_images'),
                                  output_csv_path=os.path.join(output_folder, 'angles.csv'),
                                  error_csv_path=os.path.join(output_folder, 'errors.csv'),

@@ -136,10 +136,12 @@ def get_merged_debug_im(debug_ims):
         print('Exception creating image', e)
         raise e
 
-def get_primary_root_angle(seed_centroid, r, im, seg_im, seed_im, skel, save_debug_image):
+def get_primary_root_angle(seed_centroid, inner_radius, outer_radius,
+                           im, seg_im, seed_im, skel, save_debug_image):
     """ get the primary root angle for the specific seed centroid
         TODO: refactor this function. It's way too long.
     """
+
     # dont modify in place.. it gets messy so make a copy.
     _t = time.time()
     seg_im = np.array(seg_im)
@@ -158,11 +160,10 @@ def get_primary_root_angle(seed_centroid, r, im, seg_im, seed_im, skel, save_deb
     y = round(seed_centroid[0] * seed_im.shape[0])
     x = round(seed_centroid[1] * seed_im.shape[1])
 
-
     if save_debug_image:
         rgbskel = gray2rgb(skel)
         # add semi-circle to show location on skel
-        rr, cc  = circle_perimeter(y, x, r)
+        rr, cc  = circle_perimeter(y, x, outer_radius)
         rr = [r if r > y else y for r in rr] # semi circle will be used.
         # make sure they are inside the image to avoid an error.
         rr = [min(max(r, 0), im.shape[0]-1) for r in rr]
@@ -176,9 +177,13 @@ def get_primary_root_angle(seed_centroid, r, im, seg_im, seed_im, skel, save_deb
         # add circle to show location of extracted region
         im_y = round(seed_centroid[0] * im.shape[0])
         im_x = round(seed_centroid[1] * im.shape[1])
-        im_r = round(r * (im.shape[0] / skel.shape[0]))
 
-        rr, cc  = circle_perimeter(im_y, im_x, im_r-80)
+        # inner_radius and outer_radius is specified relative to the segmentation.
+        # We rescale the coordinates to the image, just in case the image is somehow different
+        im_outer_radius = round(outer_radius * (im.shape[0] / skel.shape[0]))
+        im_inner_radius = round(inner_radius * (im.shape[0] / skel.shape[0]))
+
+        rr, cc  = circle_perimeter(im_y, im_x, im_inner_radius)
         rr = [r if r > im_y else im_y for r in rr] # semi circle will be used.
         # make sure they are inside the image to avoid an error.
         rr = [min(max(r, 0), im.shape[0]-1) for r in rr]
@@ -189,7 +194,7 @@ def get_primary_root_angle(seed_centroid, r, im, seg_im, seed_im, skel, save_deb
 
         red_line_im[rr, cc, 0] =  1.0
         
-        rr, cc  = circle_perimeter(im_y, im_x, im_r)
+        rr, cc  = circle_perimeter(im_y, im_x, im_outer_radius)
         rr = [r if r > im_y else im_y for r in rr] # semi circle will be used.
         # make sure they are inside the image to avoid an error.
         rr = [min(max(r, 0), im.shape[0]-1) for r in rr]
@@ -203,14 +208,14 @@ def get_primary_root_angle(seed_centroid, r, im, seg_im, seed_im, skel, save_deb
         debug_ims.append(im)
 
     # then take larger disk and set to 0 if outside
-    rr, cc = disk((y, x), r-80)
+    rr, cc = disk((y, x), inner_radius)
     rr = [r if r > y else y for r in rr] # semi circle will be used.
     # make sure values are inside the image.
     rr = [min(max(r, 0), mask.shape[0]-1) for r in rr]
     cc = [min(max(c, 0), mask.shape[1]-1) for c in cc]
     mask[rr, cc] = 1
 
-    rr, cc = disk((y, x), r)
+    rr, cc = disk((y, x), outer_radius)
     rr = [r if r > y else y for r in rr] # semi circle will be used.
 
     # make sure values are inside the image.
@@ -221,13 +226,14 @@ def get_primary_root_angle(seed_centroid, r, im, seg_im, seed_im, skel, save_deb
     
     skel[mask < 1] = 0
 
-    y_start = max(0, y-(r+20))
+    y_start = max(0, y-(outer_radius+20))
 
     if save_debug_image:
-        debug_ims.append(gray2rgb(skel[y_start:y+(r+20), x-(r+20):x+(r+20)]))
+        debug_ims.append(gray2rgb(skel[y_start:y+(outer_radius+20),
+                                       x-(outer_radius+20):x+(outer_radius+20)]))
 
-    # hide smaller disk. Note, this was previously r-40
-    rr, cc = disk((y, x), r-80)
+    # hide inner circle (less than inner radius)
+    rr, cc = disk((y, x), inner_radius)
     rr = [r if r > y else y for r in rr] # semi circle will be used.
     # make sure values are inside the image.
     rr = [min(max(r, 0), mask.shape[0]-1) for r in rr]
@@ -236,8 +242,9 @@ def get_primary_root_angle(seed_centroid, r, im, seg_im, seed_im, skel, save_deb
     skel[mask < 1] = 0
 
     if save_debug_image:
-        y_start = max(0, y-(r+20))
-        debug_ims.append(gray2rgb(skel[y_start:y+(r+20), x-(r+20):x+(r+20)]))
+        y_start = max(0, y-(outer_radius+20))
+        debug_ims.append(gray2rgb(skel[y_start:y+(outer_radius+20),
+                                       x-(outer_radius+20):x+(outer_radius+20)]))
 
     # take the regions left.
     # get the ones with the min and max x values.
@@ -268,8 +275,9 @@ def get_primary_root_angle(seed_centroid, r, im, seg_im, seed_im, skel, save_deb
         region_im = binary_dilation(region_im)
         region_im = binary_dilation(region_im)
         region_im = binary_dilation(region_im)
-        y_start = max(0, y-(r+20))
-        debug_ims.append(gray2rgb(region_im[y_start:y+(r+20), x-(r+20):x+(r+20)]))
+        y_start = max(0, y-(outer_radius+20))
+        debug_ims.append(gray2rgb(region_im[y_start:y+(outer_radius+20),
+                                            x-(outer_radius+20):x+(outer_radius+20)]))
 
     # get angle between the three points.
     a = np.array([smallest_x_region.centroid[1], smallest_x_region.centroid[0]])
@@ -289,7 +297,8 @@ def get_primary_root_angle(seed_centroid, r, im, seg_im, seed_im, skel, save_deb
         # draw line to indicate detected position of primary roots.
         angle_im[:, :, 0] = draw_line(angle_im[:, :, 0], y1=y, x1=x, y2=a[1], x2=a[0])
         angle_im[:, :, 0] = draw_line(angle_im[:, :, 0], y1=y, x1=x, y2=c[1], x2=c[0])
-        debug_ims.append(angle_im[y_start:y+(r+20), x-(r+20):x+(r+20)])
+        debug_ims.append(angle_im[y_start:y+(outer_radius+20),
+                                  x-(outer_radius+20):x+(outer_radius+20)])
 
     if save_debug_image:
         merged = get_merged_debug_im(debug_ims)
@@ -332,8 +341,8 @@ def add_text(image, text, x, y):
 
 
 def get_angles_from_image(seg_dataset_dir, im_dataset_dir, seed_seg_dir,
-                          max_seed_points_per_im,
-                          r, debug_image_dir, save_debug_image,
+                          max_seed_points_per_im, inner_radius,
+                          outer_radius, debug_image_dir, save_debug_image,
                           output_csv_path,
                           error_csv_path,
                           fname):
@@ -346,11 +355,11 @@ def get_angles_from_image(seg_dataset_dir, im_dataset_dir, seed_seg_dir,
     im = None
     # we don't know what extension the original files have. Go through the common ones
     for ext in ['.JPG', '.JPEG', '.PNG', '.TIFF']:
-        path = os.path.join(im_dataset_dir, fname.replace('.png', ext))
+        path = os.path.join(im_dataset_dir, os.path.splitext(fname)[0] + ext)
         if os.path.isfile(path):
             im = imread(path)
             break
-        path = os.path.join(im_dataset_dir, fname.replace('.png', ext.lower()))
+        path = os.path.join(im_dataset_dir, os.path.splitext(fname)[0] + ext.lower())
         if os.path.isfile(path):
             im = imread(path)
             break
@@ -381,8 +390,9 @@ def get_angles_from_image(seg_dataset_dir, im_dataset_dir, seed_seg_dir,
     errors = []
     for i, (c, seed_mask, seed_size) in enumerate(zip(centroids, seed_masks, seed_pixels)):
 
-        angle_degrees, debug_image, error = get_primary_root_angle(c, r, im, seg_im,
-                                                                   seed_mask, skel, save_debug_image)
+        angle_degrees, debug_image, error = get_primary_root_angle(c, inner_radius, outer_radius,
+                                                                   im, seg_im, seed_mask,
+                                                                   skel, save_debug_image)
         if angle_degrees:
             print(f"{fname},{angle_degrees},{i},{c[1]},{c[0]},{seed_size}",
                   file=open(output_csv_path, 'a'))
@@ -406,19 +416,24 @@ def extract_all_angles(root_seg_dir, im_dataset_dir,
                        debug_image_dir,
                        output_csv_path,
                        error_csv_path,
-                       radius=300):
+                       inner_radius=220,
+                       outer_radius=300):
     """
     Go thorugh all images and extract all primary root angles (up to max 2 per image)
     """
-    assert radius >= 80, 'radius must be at least 80'
+    print('Extract all angles')
+    assert outer_radius > inner_radius, 'outer radius must be bigger than inner radius'
 
     # if the debug folder doesn't already exist then it will be created.
     if not os.path.isdir(debug_image_dir):
         print(f'Creating {debug_image_dir}')
         os.makedirs(debug_image_dir)
-
+    
     seg_fnames = os.listdir(seed_seg_dir)
+    print('Seed segmentations', len(seg_fnames))
     seg_fnames = [s for s in seg_fnames if '.png' in s]
+
+    print('Extract all angles from', len(seg_fnames), 'seeg segmentations')
 
     print("file_name,angle_degrees,seed_index,seed_x,seed_y,seed_pixels",
           file=open(output_csv_path, 'w+'))
@@ -432,7 +447,8 @@ def extract_all_angles(root_seg_dir, im_dataset_dir,
             get_angles_from_image(root_seg_dir, im_dataset_dir,
                                   seed_seg_dir,
                                   max_seed_points_per_im,
-                                  radius,
+                                  inner_radius,
+                                  outer_radius,
                                   debug_image_dir,
                                   save_debug_image=True,
                                   output_csv_path=output_csv_path,

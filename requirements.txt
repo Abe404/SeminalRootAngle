@@ -4,3 +4,6 @@ humanize
 humanfriendly
 scikit-image
 matplotlib
+imageio[pyav]
+imageio[opencv]
+
